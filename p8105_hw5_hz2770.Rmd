@@ -5,3 +5,28 @@ date: "11/16/2021"
 output: github_document
 ---
 
+```{r}
+library(tidyverse)
+
+# read the csv
+homicide_data = read.csv("./data/homicide_data.csv")
+```
+
+## Problem 1
+The dataset contains 52179 homicide cases and 12 variables including the date, victim's demographic information, city, state, precise longitude and latitude, and disposition status.
+
+Then we create a new variable called `city_state`, and show the number of all homicides and unsolved homicides in each `city_state`.
+```{r}
+homicide_data = 
+  homicide_data %>% 
+  unite("city_state", city, state, sep = ", ")
+
+homicide_data %>% 
+  group_by(city_state) %>% 
+  summarise(
+    total_homicides = n(),
+    unsolved_homicides = sum(disposition %in% c("Closed without arrest", "Open/No arrest"))
+  ) %>% 
+  knitr::kable()
+```
+
