@@ -21,12 +21,72 @@ homicide_data =
   homicide_data %>% 
   unite("city_state", city, state, sep = ", ")
 
-homicide_data %>% 
+summary_data = 
+  homicide_data %>% 
   group_by(city_state) %>% 
   summarise(
     total_homicides = n(),
     unsolved_homicides = sum(disposition %in% c("Closed without arrest", "Open/No arrest"))
+  )
+
+knitr::kable(summary_data)
+```
+
+Then we perform a prop.test for the city Baltimore, MD,
+```{r}
+baltimore =
+  summary_data %>% 
+  filter(city_state == "Baltimore, MD")
+
+balt_prop =
+  prop.test(
+    x = pull(baltimore, unsolved_homicides),
+    n = pull(baltimore, total_homicides)
   ) %>% 
-  knitr::kable()
+  broom::tidy()
+
+balt_prop
+
+pull(balt_prop, estimate)
+pull(balt_prop, conf.low)
+pull(balt_prop, conf.high)
+```
+
+Now, we can perform `prop.test` for every city, and get the estimate proportion and confidence interval.
+```{r}
+city_prop = 
+  summary_data %>% 
+  mutate(
+    prop_test = map2(.x = unsolved_homicides, .y = total_homicides, ~prop.test(x = .x, n = .y)),
+    tidy_test = map(.x = prop_test, ~broom::tidy(.x))
+  ) %>% 
+  select(-prop_test) %>% 
+  unnest(tidy_test) %>% 
+  select(city_state, estimate, conf.low, conf.high)
+```
+
+Create a plot to show above results.
+
+```{r}
+city_prop %>% 
+  mutate(
+    city_state = fct_reorder(city_state, estimate)
+  ) %>% 
+  ggplot(aes(x = city_state, y = estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high)) +
+  coord_flip() +
+  labs(
+    x = "city",
+    y = "estimate",
+    title = "Estimates and CIs for unsolved proportions across different cities"
+  )
+```
+
+
+## Problem 2
+
+```{r}
+
 ```
 
