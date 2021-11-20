@@ -7,10 +7,13 @@ output: github_document
 
 ```{r}
 library(tidyverse)
-
-# read the csv
-homicide_data = read.csv("./data/homicide_data.csv")
 ```
+
+```{r}
+# read the csv
+homicide_data = read.csv("./data/homicide_data.csv", na = c(" ", "Unknown"))
+```
+
 
 ## Problem 1
 The dataset contains 52179 homicide cases and 12 variables including the date, victim's demographic information, city, state, precise longitude and latitude, and disposition status.
@@ -19,7 +22,10 @@ Then we create a new variable called `city_state`, and show the number of all ho
 ```{r}
 homicide_data = 
   homicide_data %>% 
-  unite("city_state", city, state, sep = ", ")
+  mutate(city_state = str_c(city, ", ", state)) %>% 
+  relocate(city_state) %>% 
+  filter(city_state != "Tulsa, AL")
+
 
 summary_data = 
   homicide_data %>% 
@@ -32,21 +38,23 @@ summary_data =
 knitr::kable(summary_data)
 ```
 
-Then we perform a prop.test for the city Baltimore, MD,
+Then we perform a prop.test for the city Baltimore, MD, and get the estimate proportion and confidence interval.
 ```{r}
 baltimore =
   summary_data %>% 
   filter(city_state == "Baltimore, MD")
 
+# prop.test for baltimore, MD
 balt_prop =
   prop.test(
-    x = pull(baltimore, unsolved_homicides),
-    n = pull(baltimore, total_homicides)
+    x = baltimore %>% pull(unsolved_homicides),
+    n = baltimore %>% pull(total_homicides)
   ) %>% 
   broom::tidy()
 
 balt_prop
 
+# pull the estimate proportion and 95% confidence interval
 pull(balt_prop, estimate)
 pull(balt_prop, conf.low)
 pull(balt_prop, conf.high)
@@ -75,18 +83,94 @@ city_prop %>%
   ggplot(aes(x = city_state, y = estimate)) +
   geom_point() +
   geom_errorbar(aes(ymin = conf.low, ymax = conf.high)) +
-  coord_flip() +
   labs(
     x = "city",
     y = "estimate",
     title = "Estimates and CIs for unsolved proportions across different cities"
-  )
+  ) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 ```
 
 
 ## Problem 2
 
 ```{r}
+# get the path
+path = str_c(
+  "./data/zip_data/", list.files("./data/zip_data/")
+  )
 
+study_data = tibble(
+  file_name = list.files("./data/zip_data/"),
+  subjects = purrr::map(path, read_csv)
+) %>% 
+  mutate(file_name = str_remove(file_name, ".csv")) %>% 
+  separate(file_name, c("control_arm", "subject_ID"), sep = "_") %>%
+  mutate(
+    subject_ID = as.numeric(subject_ID),
+    control_arm = as.factor(control_arm),
+    control_arm = recode(control_arm, con = "control_group", exp = "experiment_group")
+  ) %>% 
+  unnest(subjects) %>% 
+  pivot_longer(
+    week_1:week_8,
+    names_to = "week",
+    names_prefix = "week_",
+    values_to = "observations"
+  ) %>% 
+  mutate(week = as.numeric(week))
+
+# show the tidied dataframe
+study_data
+```
+
+
+Make a spaghetti plot.
+```{r}
+study_data %>% 
+  ggplot(aes(x = week, y = observations, group = subject_ID)) +
+  facet_grid(.~control_arm) +
+  geom_line() +
+  labs(
+    x = "week",
+    y = "observations",
+    title = "weekly observations in different arms"
+  )
+```
+
+From the spaghetti plot, we can see that the experiment arm has an overall increasing trend as time goes by, while the control arm has a rather stable value with a little fluctuation.
+
+
+## Problem 3
+```{r}
+set.seed(10)
+
+iris_with_missing = iris %>% 
+  map_df(~replace(.x, sample(1:150, 20), NA)) %>%
+  mutate(Species = as.character(Species))
+```
+
+Write a function to fill in the missing values for two cases, and apply this function to the columns of `iris_with_missing`.
+
+```{r}
+fill_in_missing = function(x){
+  # case 1 : replace missing values in numeric variables with the mean of non-missing values
+  if(is.numeric(x)){
+    x = ifelse(is.na(x), mean(x, na.rm = TRUE), x)
+  }
+  
+  # case 2 :replace missing values in character variables with "virginica"
+  else if(is.character(x)){
+    x = ifelse(is.na(x), "Virginica", x)
+  }
+  
+  return(x)
+}
+
+iris_with_replace = map(iris_with_missing, fill_in_missing)
+
+iris_with_replace %>%
+  as_tibble() %>%
+  knitr::kable()
 ```
 
