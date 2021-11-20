@@ -107,7 +107,6 @@ study_data = tibble(
   mutate(file_name = str_remove(file_name, ".csv")) %>% 
   separate(file_name, c("control_arm", "subject_ID"), sep = "_") %>%
   mutate(
-    subject_ID = as.numeric(subject_ID),
     control_arm = as.factor(control_arm),
     control_arm = recode(control_arm, con = "control_group", exp = "experiment_group")
   ) %>% 
@@ -128,9 +127,9 @@ study_data
 Make a spaghetti plot.
 ```{r}
 study_data %>% 
-  ggplot(aes(x = week, y = observations, group = subject_ID)) +
-  facet_grid(.~control_arm) +
+  ggplot(aes(x = week, y = observations, color = subject_ID)) +
   geom_line() +
+  facet_grid(.~control_arm) +
   labs(
     x = "week",
     y = "observations",
@@ -138,7 +137,7 @@ study_data %>%
   )
 ```
 
-From the spaghetti plot, we can see that the experiment arm has an overall increasing trend as time goes by, while the control arm has a rather stable value with a little fluctuation.
+From the spaghetti plot, we can see that observations in experiment arm has an overall increasing trend as time goes by, while the control arm has a rather stable value with a little fluctuations.
 
 
 ## Problem 3
